@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
+import java.io.BufferedReader;
+import java.nio.file.Files;
+import java.util.ArrayList;
 /**
  * Reads the datasets of Application A. You must write the two methods below.
  *
@@ -34,8 +37,31 @@ public final class DatasetReader {
      * Use maxLines = Integer.MAX_VALUE to read the whole file.
      */
     public static List<WordCount> readWordCounts(Path file, int maxLines) throws IOException {
-        // TODO
-        throw new UnsupportedOperationException("Not implemented yet");
+        //create "words" arraylist to store words and their frequencies
+        List<WordCount> words = new ArrayList<>();
+        //open the file
+        try (BufferedReader reader = Files.newBufferedReader(file)){
+            String line;
+            int linesRead = 0;
+
+            //read until the maxLines are reached or the file ends
+            while (linesRead < maxLines && (line = reader.readLine()) != null) {
+                linesRead++;
+                //Split each line into the word and its appearance frequency
+                String[] parts = line.split("\t");
+                //skip the lines that doen't have both
+                if (parts.length != 2 ) {
+                    continue;
+                }
+                //get the word and its frequency
+                String word = parts[0];
+                long count = Long.parseLong(parts[1]);
+                //Add the word and its freq count to the "words" arraylist
+                words.add(new WordCount(word, count));
+            }
+        }
+        return words;
+        
     }
 
     /**
@@ -45,7 +71,41 @@ public final class DatasetReader {
      * Document in your report how you handle apostrophes, hyphens and digits.
      */
     public static List<String> readBookWords(Path file) throws IOException {
-        // TODO
-        throw new UnsupportedOperationException("Not implemented yet");
+        //Create an arraylist to store the words
+        List<String> words = new ArrayList<>();
+        //opening the file
+        try (BufferedReader reader = Files.newBufferedReader(file)){
+            String line;
+            boolean readingBook = false;
+            //keep reading as long as there are more lines to read (of the story)
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("*** START OF")) {
+                    readingBook = true;
+                    continue;
+                }
+                //stop reading when the story ends
+                if (line.startsWith("*** END OF")){
+                    break;
+                }
+                //skip anything that isn't part of the actual story
+                if (! readingBook){
+                    continue;
+                }
+                // Convert letters to lowercase
+                line = line.toLowerCase();
+                //replace punctuationa nd digits with spaces
+                line = line.replaceAll("[^a-z]+", " ");
+                //splitting the line into words
+                String[] parts = line.trim().split("\\s+");
+                //add nonempty words to the list
+                for (String word : parts) {
+                    if (!word.isEmpty()) {
+                        words.add(word);
+                    }
+                }
+            
+            }
+        }
+        return words;
     }
 }
