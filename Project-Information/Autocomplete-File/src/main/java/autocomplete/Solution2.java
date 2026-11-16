@@ -1,32 +1,37 @@
-
 package autocomplete;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Solution 2 for the dictionary service.
+ * <b>Solution 2 — self-balancing AVL binary search tree.</b>
  *
- * uses a self-balancing AVL binary search tree,
- * adapted from the COMP 272 BinarySearchTree and
- * AVLTree course codes.
-
- * expected time complexities:
- * add(): O(log n)
- * remove(): O(log n)
- * contains(): O(log n)
- * frequency(): O(log n)
- * complete(): O(log n + m * L)
- * size(): O(1)
+ * <p>Adapted from the COMP 272 {@code BinarySearchTree} and {@code AVLTree}
+ * course code. Each node stores a word, its count, parent/left/right links and
+ * its subtree height. All four rotation cases are implemented; rebalancing is
+ * performed upward from the modified node on every {@code add}/{@code remove}.
  *
- * m is the number of matching words examined,
- * limited to k, and L is the cost of string checks.
+ * <p><b>Time complexities:</b>
+ * <ul>
+ *   <li>{@code add} / {@code remove} / {@code contains} / {@code frequency} — O(log n)</li>
+ *   <li>{@code complete(prefix, k)} — O(log n + m + m log m): O(log n) to
+ *       locate the first prefix match, then m matching nodes are collected
+ *       (subtrees outside the prefix range are pruned), then m log m to sort
+ *       by (count desc, word asc)</li>
+ *   <li>{@code size} — O(1)</li>
+ * </ul>
+ *
+ * <p><b>Trade-off:</b> slower writes than a hash table, but the BST stores the
+ * keys in order, so {@code complete} can prune entire subtrees that cannot
+ * contain a prefix match. This is what makes short-prefix queries fast.
  */
 public class Solution2 implements Dictionary {
+
     // Store the root node of the AVL tree
     private Node root;
     // stores the number of words in the dictionary
     private int size;
+
     // adapted from BinarySearchTree.Node
     // create a class to represent ecah tree node
     private static class Node {
@@ -34,24 +39,18 @@ public class Solution2 implements Dictionary {
         String word;
         // frequency count of the word.
         long count;
-        Node left;
-        Node right;
-        Node parent;
+        Node left, right, parent;
         int height = 0;
-
         Node(String word, long count, Node parent) {
-            this.word = word;
-            this.count = count;
-            this.parent = parent;
+            // Store the word, the count, and a link to the parent
+            this.word = word; this.count = count; this.parent = parent;
         }
     }
 
     // Constructor for an empty dictionary
-    public Solution2() {
-        root = null;
-        size = 0;
-    }
+    public Solution2() { root = null; size = 0; }
 
+    // ------------------------------------------------------------------ add
     @Override
     public void add(String word, long count) {
         // check whether the tree is empty
@@ -62,131 +61,98 @@ public class Solution2 implements Dictionary {
             return;
         }
         // start searching for the insertion position at the root
-        Node current = root;
-        Node parent = null;
+        Node cur = root, parent = null;
         // searching until an empty position is found
-        while (current != null) {
+        while (cur != null) {
             // save the current node as the parent
-            parent = current;
+            parent = cur;
             // Ccompare the new word alphabetically
             // with the word stored in the current node
-            int comparison = word.compareTo(current.word);
+            int cmp = word.compareTo(cur.word);
             // check if the word already exists
-            if (comparison == 0) {
+            if (cmp == 0) {
                 // update the existing word's frequency
-                current.count = count;
+                cur.count = count;
                 return;
             }
             // if the new word comes alphabetically before
-            // the current word then move to the left child
-            else if (comparison < 0) {
-                current = current.left;
-
+            // the current word then move to the left child,
             // otherwise move to the right child
-            } else {
-                current = current.right;
-            }
+            cur = cmp < 0 ? cur.left : cur.right;
         }
         // creating a new node with the word, count,
         // and parent found during the search
         Node inserted = new Node(word, count, parent);
         // Determine whether the new node belongs left or right of parent
-        if (word.compareTo(parent.word) < 0) {
-            parent.left = inserted;
-        } else {
-            parent.right = inserted;
-        }
+        if (word.compareTo(parent.word) < 0) parent.left = inserted;
+        else parent.right = inserted;
         // increase size of stored wordes
         size++;
         // restore AVL balance starting from the inserted node's parent.
         rebalanceUpward(parent);
     }
-    
+
+    // ------------------------------------------------------------------ lookup
     //Search for a word using BST ordering
     private Node findNode(String word) {
         // begin search from the root
-        Node current = root;
+        Node cur = root;
         // search until the word is found or the search reaches an empty node
-        while (current != null) {
+        while (cur != null) {
             // compare requested word with word stored in the current node
-            int comparison = word.compareTo(current.word);
+            int cmp = word.compareTo(cur.word);
             //if the words match return the node
-            if (comparison == 0) {
-                return current;
+            if (cmp == 0) return cur;
             // if the requested word is smaller, continue searching the left subtree
-            } else if (comparison < 0) {
-                current = current.left;
             //else, search the right
-            } else {
-                current = current.right;
-            }
+            cur = cmp < 0 ? cur.left : cur.right;
         }
         // return null if the word isn't fount
         return null;
     }
 
-    @Override
-    public boolean contains(String word) {
+    @Override public boolean contains(String word) {
         // search for the word and return true ifa matching node exists
         return findNode(word) != null;
     }
 
-    @Override
-    public long frequency(String word) {
+    @Override public long frequency(String word) {
         //search for the node containing the word
-        Node found = findNode(word);
-        //if the word does not exist, return zero
-        if (found == null) {
-            return 0;
-        }
-        //Return the frequency stored in the node.
-        return found.count;
+        Node n = findNode(word);
+        //if the word does not exist, return zero,
+        //otherwise return the frequency stored in the node.
+        return n == null ? 0 : n.count;
     }
 
+    // ------------------------------------------------------------------ remove
     @Override
     public boolean remove(String word) {
         //search for the node containing the word
         // If the word does not exist, return false
         Node node = findNode(word);
-        if (node == null) {
-            return false;
-        }
+        if (node == null) return false;
         // if the node has two children case
         if (node.left != null && node.right != null) {
-            Node successor = node.right;
-            while (successor.left != null) {
-                successor = successor.left;
-            }
-            node.word = successor.word;
-            node.count = successor.count;
-            node = successor;
+            // Find the leftmost node in the right subtree - the successor
+            Node succ = node.right;
+            while (succ.left != null) succ = succ.left;
+            // copy the successor's data here, then delete the successor instead
+            node.word = succ.word;
+            node.count = succ.count;
+            node = succ;
         }
         //reference for the remaining child
-        Node child;
-        //check whether the node has a left child
-        if (node.left != null) {
-            //use left child as the replacement
-            child = node.left;
-        } else {
-            //Otherwise use the right child
-            child = node.right;
-        }
+        Node child = (node.left != null) ? node.left : node.right;
         //save parent of the node being removed
         Node parent = node.parent;
         //if replacement child exists connect it to the deleted node's parent
-        if (child != null) {
-            child.parent = parent;
-        }
+        if (child != null) child.parent = parent;
         //if the deleted node is the root replace ti with its child
-        if (parent == null) {
-            root = child;
+        if (parent == null) root = child;
         //If node is parent's left child, replace that left reference
-        } else if (parent.left == node) {
-            parent.left = child;
-        // else replace the parent's right child.\
-        } else {
-            parent.right = child;
-        }
+        else if (parent.left == node) parent.left = child;
+        // else replace the parent's right child.
+        else parent.right = child;
         // decrease num of stored words.
         size--;
         //restore AVL balance starting at parent of removed node
@@ -194,76 +160,81 @@ public class Solution2 implements Dictionary {
         return true;
     }
 
+    // ------------------------------------------------------------------ complete
     @Override
     public List<String> complete(String prefix, int k) {
-        // create an mpty List for matching words.
-        List<String> matches = new ArrayList<>();
         //If requested number of suggestions is zero or negative return an empty list.
-        if (k <= 0) {
-            return matches;
-        }
-        //search the AVL tree for words beginning with the prefix
-        completeInOrder(root, prefix, k, matches);
+        if (k <= 0) return new ArrayList<>();
+        // create an mpty List for matching words.
+        List<Node> matches = new ArrayList<>();
+        // Upper bound is one past every string with the prefix
+        String upper = upperBound(prefix);
+        // Collect every match
+            // Pruning subtrees that can't contain one
+        collect(root, prefix, upper, matches);
+        // Sort by frequency (highest first) breaking alphabetic organization
+        matches.sort((a, b) ->
+                a.count != b.count
+                        ? Long.compare(b.count, a.count)
+                        : a.word.compareTo(b.word));
+        // Keep only the first k words
+        List<String> out = new ArrayList<>(Math.min(k, matches.size()));
+        for (int i = 0; i < k && i < matches.size(); i++) out.add(matches.get(i).word);
         //return matching words
-        return matches;
-    }
-    //use inorder traversal to find matching words
-    //in alphabetical order
-    private void completeInOrder(
-            Node node,
-            String prefix,
-            int k,
-            List<String> matches) {
-        // Stop if the node does not exist or
-        //enough matching words have been found
-        if (node == null || matches.size() >= k) {
-            return;
-        }
-        //compare the current word with the prefix
-        int comparison = node.word.compareTo(prefix);
-        // if current is alphabetically greater than or equal to the prefix,
-        // search the left subtree for possible matches
-        if (comparison >= 0) {
-            completeInOrder(node.left, prefix, k, matches);
-        }
-        //Stop if the requested number of matching words has been collected
-        if (matches.size() >= k) {
-            return;
-        }
-        //check whether the current word begins with the requested prefix
-        if (node.word.startsWith(prefix)) {
-            //add the matching word to the list
-            matches.add(node.word);
-        }
-        //search the right subtree for additional words that begin with the prefix
-        completeInOrder(node.right, prefix, k, matches);
+        return out;
     }
 
-    @Override
-    public int size() {
+    /**
+     * Returns the smallest string that is greater than every string starting
+     * with {@code prefix}; {@code null} means "no upper bound" (prefix is all
+     * {@link Character#MAX_VALUE} characters, which cannot occur for real words).
+     */
+    private static String upperBound(String prefix) {
+        // Empty prefix means no upper bound
+        if (prefix.isEmpty()) return null;
+        char last = prefix.charAt(prefix.length() - 1);
+        // If the last character is already maxed out, drop it and try again
+        if (last == Character.MAX_VALUE)
+            return upperBound(prefix.substring(0, prefix.length() - 1));
+        // Bump the last character up by one to get just past the prefix
+        return prefix.substring(0, prefix.length() - 1) + (char) (last + 1);
+    }
+
+    //use inorder traversal to find matching words
+    private void collect(Node node, String prefix, String upper, List<Node> out) {
+        // Stop if the node does not exist
+        if (node == null) return;
+        // if this node sorts at or after the prefix, the left subtree may hold matches
+        if (node.word.compareTo(prefix) > 0) collect(node.left, prefix, upper, out);
+        //check whether the current word begins with the requested prefix
+        if (node.word.startsWith(prefix)) out.add(node);
+        // Only search right while below the upper bound
+        if (upper == null || node.word.compareTo(upper) < 0)
+            collect(node.right, prefix, upper, out);
+    }
+
+    @Override public int size() {
         //Return the number of stored words
         return size;
     }
 
+    // ------------------------------------------------------------------ AVL
     //adapted from BinarySearchTree.
-    private int height(Node node) {
+    private int height(Node n) {
         //return -1 for an empty subtree, otherwise return the stored node height
-        return node == null ? -1 : node.height;
+        return n == null ? -1 : n.height;
     }
 
     // Ddapted from BinarySearchTree.
-    private void updateHeight(Node node) {
+    private void updateHeight(Node n) {
         // Find the greater height of the two children,add one for the current node
-        node.height = 1 + Math.max(
-            height(node.left),
-            height(node.right)
-        );
+        n.height = 1 + Math.max(height(n.left), height(n.right));
     }
 
     //Adapted from AVLTree
-    private int balanceFactor(Node node) {
+    private int balanceFactor(Node n) {
         //subtract the right subtree height from the left subtree height.
-        return height(node.left) - height(node.right);
+        return height(n.left) - height(n.right);
     }
 
     //adapted from AVLTree
@@ -275,25 +246,21 @@ public class Solution2 implements Dictionary {
             //Store the curent subtree root
             Node subtreeRoot = node;
             //Calculate the node's balance factor
-            int balance = balanceFactor(node);
+            int bf = balanceFactor(node);
             // check if the left subtree is more than one level taller
-            if (balance > 1) {
+            if (bf > 1) {
                 // perform a left rotation
-                if (balanceFactor(node.left) < 0) {
-                    rotateLeft(node.left);
-                }
+                if (balanceFactor(node.left) < 0) rotateLeft(node.left);
                 // rotate right to restore balance.
                 subtreeRoot = rotateRight(node);
-            // check wehther the right subtree is more than one level taller
-            } else if (balance < -1) {
+            // check whether the right subtree is more than one level taller
+            } else if (bf < -1) {
                 //right rotation first
-                if (balanceFactor(node.right) > 0) {
-                    rotateRight(node.right);
-                }
+                if (balanceFactor(node.right) > 0) rotateRight(node.right);
                 // Rotate left to restore balance
                 subtreeRoot = rotateLeft(node);
             }
-            //continue checking the parent 
+            //continue checking the parent
             node = subtreeRoot.parent;
         }
     }
@@ -307,15 +274,13 @@ public class Solution2 implements Dictionary {
         //connect new root to the original parent
         replaceAtParent(oldRoot, newRoot);
         // make old root the left child of the new root
-        newRoot.left = oldRoot;
+        newRoot.left = oldRoot; oldRoot.parent = newRoot;
         //update the old root's parent ref
         oldRoot.parent = newRoot;
         //Move middle subtree to the right side of the old root
         oldRoot.right = middle;
         //if the middle subtree exists update its parent reference
-        if (middle != null) {
-            middle.parent = oldRoot;
-        }
+        if (middle != null) middle.parent = oldRoot;
         //update the oldd root's height
         updateHeight(oldRoot);
         //update the new root's height second
@@ -333,15 +298,13 @@ public class Solution2 implements Dictionary {
         // connect the new root to the og parent
         replaceAtParent(oldRoot, newRoot);
         // Make the old root the right child of new root
-        newRoot.right = oldRoot;
+        newRoot.right = oldRoot; oldRoot.parent = newRoot;
         //update the old root's parent reference
         oldRoot.parent = newRoot;
         //move the middle subtree to left side of the old root
         oldRoot.left = middle;
         //if middle subtree exists then update its parent reference
-        if (middle != null) {
-            middle.parent = oldRoot;
-        }
+        if (middle != null) middle.parent = oldRoot;
         //update the old root's height
         updateHeight(oldRoot);
         //update the new root's height
@@ -351,22 +314,17 @@ public class Solution2 implements Dictionary {
     }
 
     //adapted from AVLTree
-    private void replaceAtParent(
-            Node oldRoot, Node newRoot) {
+    private void replaceAtParent(Node oldRoot, Node newRoot) {
         //save the parent of the original subtree root
-        Node parent = oldRoot.parent;
+        Node p = oldRoot.parent;
         //assign the original parent to the new root
-        newRoot.parent = parent;
+        newRoot.parent = p;
         //if the original subtree was the entire tree thenupdate the tree's root reference.
-        if (parent == null) {
-            root = newRoot;
+        if (p == null) root = newRoot;
         //if old root was a left child,
         //connect the new root as the left child
-        } else if (parent.left == oldRoot) {
-            parent.left = newRoot;
+        else if (p.left == oldRoot) p.left = newRoot;
         //else connect the new root as the parent's right child
-        } else {
-            parent.right = newRoot;
-        }
+        else p.right = newRoot;
     }
 }
