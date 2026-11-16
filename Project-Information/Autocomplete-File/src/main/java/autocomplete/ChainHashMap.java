@@ -3,7 +3,6 @@ package autocomplete;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-
 /**
  * Chained hash map with separate chaining, adapted from the COMP 272
  * ChainHashMap course code. Automatically resizes at a 0.75 load factor.
