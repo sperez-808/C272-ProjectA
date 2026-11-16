@@ -1,63 +1,57 @@
 package autocomplete;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Solution 1 for the dictionary service.
- * 
- *  Solution 1 uses a chianed hash map with seperate chaining
- *  to store words and their frequency counts.
- *  it uses adapted code from the course ChainHashMap code.
- *   
- *  
- *   add() = O(1)
- *   remove() = O(1)
- *   contains() = O(1)
- *   frequency() = O(1)
- *   complete() = O(n + m log m)
- *   size() = O(1)
- *   keySet() = O(C + n) where C is the table capacity and n is number of entries
- *  
-
+ * <b>Solution 1 — chained hash map (separate chaining).</b>
+ *
+ * <p>Adapted from the COMP 272 {@code ChainHashMap} course code.
+ * Words are stored in a {@link ChainHashMap} keyed by the word; the value is
+ * the word's frequency count.
+ *
+ * <p><b>Time complexities:</b>
+ * <ul>
+ *   <li>{@code add} / {@code remove} / {@code contains} / {@code frequency} — O(1) average</li>
+ *   <li>{@code complete(prefix, k)} — O(n + m log m): scan all n keys, sort the
+ *       m matches by (count desc, word asc)</li>
+ *   <li>{@code size} — O(1)</li>
+ * </ul>
+ *
+ * <p><b>Trade-off:</b> fast exact lookup but <em>no key order</em>, so
+ * {@code complete} cannot prune the search — every key is examined.
  */
 public class Solution1 implements Dictionary {
+
     // to store words nd their frequency counts
-    private ChainHashMap<String, Long> dictionary;
+    // the reference never changes after the constructor, so mark it final
+    private final ChainHashMap<String, Long> dictionary;
 
     public Solution1() {
         // initialize your data structure.
-       dictionary = new ChainHashMap<>(101);
+        // 101 is prime - the map resizes automatically as it fills
+        dictionary = new ChainHashMap<>(101);
     }
 
-    @Override
-    public void add(String word, long count) {
+    @Override public void add(String word, long count) {
         //add a word or replace a word's existing frequency
         dictionary.put(word, count);
     }
 
-    @Override
-    public boolean remove(String word) {
-        // removes word and return whether it existed
+    @Override public boolean remove(String word) {
+        //removes word and return whether it existed
         return dictionary.remove(word) != null;
     }
 
-    @Override
-    public boolean contains(String word) {
-       //check if word exists
-       return dictionary.get(word) != null;
+    @Override public boolean contains(String word) {
+        //check if word exists
+        return dictionary.get(word) != null;
     }
 
-    @Override
-    public long frequency(String word) {
-        //get the word's frequency
-        Long count = dictionary.get(word);
-        //return 0 if word does not exist
-        if (count == null) {
-            return 0;
-        }
-        return count;
+    @Override public long frequency(String word) {
+        //get the word's frequency - return 0 if word does not exist
+        Long c = dictionary.get(word);
+        return c == null ? 0 : c;
     }
 
     @Override
@@ -65,55 +59,26 @@ public class Solution1 implements Dictionary {
         //create list for matching words
         List<String> matches = new ArrayList<>();
         // Return empty list if k is 0 or less
-        if (k <= 0) {
-            return matches;
-        }
+        if (k <= 0) return matches;
+
         //find all the words starting with a prefix
+        // A hash map has no key order, so need to check every key
         for (String word : dictionary.keySet()) {
-            if (word.startsWith(prefix)){
-                matches.add(word);
-            }
+            if (word.startsWith(prefix)) matches.add(word);
         }
         //sort by frequency (highest first)
         //break ties by listing words alphabetically
-        matches.sort((a,b) -> {
-            long countA = dictionary.get(a);
-            long countB = dictionary.get(b);
-
-            if (countA != countB) {
-               return Long.compare(countB, countA); 
-            }
-            return a.compareTo(b);
+        matches.sort((a, b) -> {
+            long ca = dictionary.get(a);
+            long cb = dictionary.get(b);
+            return ca != cb ? Long.compare(cb, ca) : a.compareTo(b);
         });
         //return at most k matching words
         return new ArrayList<>(matches.subList(0, Math.min(k, matches.size())));
     }
 
-    @Override
-    public int size() {
+    @Override public int size() {
         //return number of stored words
         return dictionary.size();
     }
-
-/* Returns a list of all keys stored in the hash map.
-* Used to implement complete().
-* adapted from the COMP 272 ChainHashMap .
-*/
-
-    @Override 
-    public List <K> keySet () {
-        //empty list to store all the keys
-        List <K> keys = new ArrayLst<>();
-        //loop through tthe hash table
-        for (LinkedList<Entry<K, V>> bucket : table) {
-            // add the keys of nonempty buckets to the list
-            if (bucket != null) {
-                for (Entry<K, V> e : bucket) {
-                    keys.add(e.key);
-                }
-            }
-        }
-        return keys;
-    }
-
 }
